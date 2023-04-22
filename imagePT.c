@@ -22,6 +22,15 @@ Matrix algorithms[]={
     {{0,0,0},{0,1,0},{0,0,0}}
 };
 
+struct threadArg {
+    int rank;
+    Image* srcImage;
+    Image* destImage;
+    enum KernelTypes type;
+};
+
+int flag = 0;
+
 int thread_count;
 
 
@@ -71,17 +80,20 @@ void convolute(Image* srcImage,Image* destImage,Matrix algorithm){ //parallelize
     }
 }
 
-void* pconvolute(void* rank){
+void* pconvolute(void* a){
+    struct threadArg args = *(struct threadArg*) a;
+    int my_rank = args.rank;
+    flag = (flag + 1) % thread_count;
+
     int row, pix, bit, span, start;
-    int my_rank = (int) rank;
-    int total_rows = c_args.destImage->height;
-    span=srcImage->bpp*srcImage->bpp;
-    rows = (int) total_rows / thread_count;
-    start = (int) my_rank * rows;
+    int total_rows = args.destImage->height;
+    span=args.srcImage->bpp * args.srcImage->bpp;
+    int rows = total_rows / thread_count;
+    start = my_rank * rows;
     for (row = start; row < start + rows; row++){
-        for (pix=0;pix<srcImage->width;pix++){
-            for (bit=0;bit<srcImage->bpp;bit++){
-                destImage->data[Index(pix,row,srcImage->width,bit,srcImage->bpp)]=getPixelValue(srcImage,pix,row,bit,algorithm);
+        for (pix=0;pix<args.srcImage->width;pix++){
+            for (bit=0;bit<args.srcImage->bpp;bit++){
+                args.destImage->data[Index(pix,row,args.srcImage->width,bit,args.srcImage->bpp)]=getPixelValue(args.srcImage,pix,row,bit,algorithms[args.type]);
             }
         }
     }
@@ -91,7 +103,7 @@ void* pconvolute(void* rank){
 //Usage: Prints usage information for the program
 //Returns: -1
 int Usage(){
-    printf("Usage: image <filename> <type>\n\twhere type is one of (edge,sharpen,blur,gauss,emboss,identity)\n");
+    printf("Usage: image <filename> <type> <number of threads>\n\twhere type is one of (edge,sharpen,blur,gauss,emboss,identity)\n");
     return -1;
 }
 
@@ -114,7 +126,7 @@ int main(int argc,char** argv){
     t1=time(NULL);
 
     stbi_set_flip_vertically_on_load(0);
-    if (argc!=3) return Usage();
+    if (argc!=4) return Usage();
     char* fileName=argv[1];
     if (!strcmp(argv[1],"pic4.jpg")&&!strcmp(argv[2],"gauss")){
         printf("You have applied a gaussian filter to Gauss which has caused a tear in the time-space continum.\n");
@@ -135,10 +147,15 @@ int main(int argc,char** argv){
     thread_count = strtol(argv[3], NULL, 10);
     pthread_t* thread_handles = (pthread_t*) malloc(thread_count * sizeof(pthread_t));
 
+    struct threadArg args;
+    args.destImage = &destImage;
+    args.srcImage = &srcImage;
+    args.type = type;
+
     for(int thread = 0; thread < thread_count; thread++){
-        c_args.srcImage = &srcImage;
-        c_args.destImage = &destImage;
-        pthread_create(&thread_handles[thread], NULL, &pconvolute, (void*) thread);
+        args.rank = thread;
+        while(flag != thread);
+        pthread_create(&thread_handles[thread], NULL, &pconvolute, (void*) &args);
     }
     for(int thread = 0; thread < thread_count; thread++){
         pthread_join(thread_handles[thread], NULL);
