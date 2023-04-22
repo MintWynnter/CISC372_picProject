@@ -90,7 +90,6 @@ void* pconvolute(void* a){
     span=args.srcImage->bpp * args.srcImage->bpp;
     int rows = total_rows / thread_count;
     start = my_rank * rows;
-    printf("I am thread %d of %d\n", my_rank, thread_count);
     for (row = start; row < start + rows; row++){
         for (pix=0;pix<args.srcImage->width;pix++){
             for (bit=0;bit<args.srcImage->bpp;bit++){
