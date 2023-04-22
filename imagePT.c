@@ -151,13 +151,13 @@ int main(int argc,char** argv){
     args.destImage = &destImage;
     args.srcImage = &srcImage;
     args.type = type;
-
-    for(int thread = 0; thread < thread_count; thread++){
+    int thread;
+    for(thread = 0; thread < thread_count; thread++){
         args.rank = thread;
         while(flag != thread);
         pthread_create(&thread_handles[thread], NULL, &pconvolute, (void*) &args);
     }
-    for(int thread = 0; thread < thread_count; thread++){
+    for(thread = 0; thread < thread_count; thread++){
         pthread_join(thread_handles[thread], NULL);
     }
 
